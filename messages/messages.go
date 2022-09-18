@@ -261,24 +261,46 @@ func (response Response) Serialize() []byte {
 	if err != nil {
 		fmt.Printf("Error when serialize arcount of the response header: %s\n", err)
 		return buff.Bytes()
-	}	
-	
-
-	labels := strings.Split(response.Question.qname, ".")
-	for _, lbl := range labels {
-		buff.WriteByte(byte(len(lbl)))
-		buff.WriteString(lbl)
 	}
 	
-	buff.WriteByte(byte(0))
+	serializeName := func(name string, buff *bytes.Buffer) {
+		// serialize question
+		labels := strings.Split(name, ".")
+		for _, lbl := range labels {
+			buff.WriteByte(byte(len(lbl)))
+			buff.WriteString(lbl)
+		}	
+		buff.WriteByte(byte(0))		
+	}
 	
-	binary.Write(buff, binary.BigEndian, response.Question.qtype)
-	binary.Write(buff, binary.BigEndian, response.Question.qclass)
-	
-	fmt.Printf("\nResponse::Serialize - buff.Bytes(): %x\n", buff.Bytes())
-	for _, b := range buff.Bytes() {
-		fmt.Printf("%x ", b)
+	serializeQuestion := func(question Question, buff *bytes.Buffer) {
+		serializeName(question.qname, buff);
+		binary.Write(buff, binary.BigEndian, question.qtype)
+		binary.Write(buff, binary.BigEndian, question.qclass)
 	}
 		
+	serializeAnswer := func(answer Answer, buff *bytes.Buffer) {
+		serializeName(answer.name, buff)
+		binary.Write(buff, binary.BigEndian, answer.atype)
+		binary.Write(buff, binary.BigEndian, answer.aclass)
+		binary.Write(buff, binary.BigEndian, answer.ttl)
+		binary.Write(buff, binary.BigEndian, uint16(len(answer.rdata)))
+		buff.Write(answer.rdata)
+	}
+	
+	// serialize question
+	serializeQuestion(response.Question, buff)
+	
+	// serialize answers
+	for _, answ := range response.answers {
+		serializeAnswer(answ, buff)
+	}
+		
+	// serialize authorities
+	for _, auth := range response.authorities {
+		serializeAnswer(auth, buff)
+	}
+	
 	return buff.Bytes()	
+	
 }
